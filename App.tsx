@@ -1,14 +1,16 @@
 
 
-import React, { useState, useEffect, useCallback, createContext, useContext, ReactNode, FC } from 'react';
+import React, { useState, useEffect, useCallback, createContext, useContext, ReactNode, FC, useRef, useMemo } from 'react';
 import { supabase, signInWithGoogle, signOut, getSession } from './services/supabase';
 import type { Session, User } from '@supabase/supabase-js';
-import type { Agendamento, TrialStatus } from './types';
+import type { Agendamento, TrialStatus, PerfilNegocio } from './types';
 import { 
     Calendar, Check, ChevronRight, Clock, Download, FileText, Filter, Link as LinkIcon, 
     Lock, LogOut, Mail, MoreVertical, Phone, Plus, RefreshCw, Search, Settings, 
     Shield, Star, Trash2, TrendingUp, User as UserIcon, X, Zap, Loader2, ArrowRight
 } from 'lucide-react';
+import { IMaskInput } from 'react-imask';
+import { jsPDF } from "jspdf";
 
 // --- API CONFIG ---
 const API_BASE_URL = "https://agendamento-ynxr.onrender.com";
@@ -51,6 +53,7 @@ const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
 // --- HELPER FUNCTIONS ---
 const formatData = (data: string) => {
+    if (!data) return '';
     const [y, m, d] = data.split("-");
     return `${d}/${m}/${y}`;
 };
@@ -103,13 +106,11 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({ children, var
 });
 
 
-// Fix: Extended CardProps with React.HTMLAttributes<HTMLDivElement> to allow passing standard div props like onClick.
 interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
     children: ReactNode;
     className?: string;
 }
 
-// Fix: The Card component now accepts and spreads additional props (...props) to the underlying div element.
 const Card: FC<CardProps> = ({ children, className, ...props }) => {
     return (
         <div className={`bg-black-medium border border-black-light rounded-2xl shadow-soft transition-all duration-300 relative overflow-hidden ${className}`} {...props}>
@@ -241,8 +242,6 @@ const LoginScreen: FC<LoginScreenProps> = ({ isTermsAccepted, onOpenTerms }) => 
 
 // --- DASHBOARD ---
 const Dashboard: FC = () => {
-    // This component would orchestrate all the logged-in functionality.
-    // For simplicity in this single-file structure, we'll keep it high-level.
     const [agendamentos, setAgendamentos] = useState<Agendamento[]>([]);
     const { session } = useAuth();
     
@@ -264,39 +263,131 @@ const Dashboard: FC = () => {
     useEffect(() => {
         fetchAgendamentos();
     }, [fetchAgendamentos]);
-
-    // This is a simplified placeholder for the full dashboard.
-    // A real implementation would have all the components like form, list, filters etc.
+    
     return (
         <div className="container mx-auto px-4 py-8 max-w-6xl">
+            {/* Header */}
             <header className="bg-black-medium border border-black-light rounded-2xl p-6 text-center mb-8 animate-fade-in relative overflow-hidden">
                 <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-silver-accent/30 to-transparent" />
                 <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
                     <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold bg-gradient-to-r from-white-pure to-silver-accent text-transparent bg-clip-text">
                         Sua Agenda
                     </h1>
-                    <Button onClick={signOut} icon={LogOut}>Sair</Button>
+                     <div className="flex gap-2 w-full sm:w-auto">
+                        <Button variant="secondary" icon={LinkIcon} className="text-xs sm:text-sm">Gerar Link</Button>
+                        <Button variant="secondary" icon={Settings} className="text-xs sm:text-sm">Configurações</Button>
+                        <Button onClick={signOut} icon={LogOut} variant="danger" className="text-xs sm:text-sm">Sair</Button>
+                    </div>
                 </div>
                 <p className="text-sm sm:text-lg text-white-ice max-w-2xl mx-auto mt-4">
                     Gerencie seus compromissos com uma interface intuitiva e elegante.
                 </p>
             </header>
-            <div className="text-center">
-              <p>Bem-vindo! O painel completo está em desenvolvimento.</p>
-              <p>A UI e os botões interativos foram aprimorados em toda a aplicação.</p>
-              <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <Button variant="primary">Botão Primário</Button>
-                  <Button variant="secondary">Botão Secundário</Button>
-                  <Button variant="premium">Botão Premium</Button>
-                  <Button variant="danger">Botão Perigo</Button>
-                  <Button variant="ghost">Botão Fantasma</Button>
-                  <Button isLoading>Carregando...</Button>
-              </div>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Coluna Esquerda: Formulário e IA */}
+                <div className="lg:col-span-1 space-y-8">
+                    {/* Appointment Form */}
+                    <Card className="p-6">
+                        <h2 className="text-xl font-semibold mb-4 text-center">Novo Agendamento</h2>
+                        <form className="space-y-4">
+                             <div>
+                                <label htmlFor="nome" className="block text-sm font-medium text-white-ice mb-1">Nome</label>
+                                <IMaskInput
+                                    mask={/.*/}
+                                    id="nome"
+                                    name="nome"
+                                    placeholder="Nome do cliente"
+                                    className="w-full px-3 py-2 rounded-lg bg-black-deep border border-black-light focus:outline-none focus:border-silver-accent"
+                                />
+                            </div>
+                            <div>
+                                <label htmlFor="telefone" className="block text-sm font-medium text-white-ice mb-1">Telefone</label>
+                                <IMaskInput
+                                    mask="(00) 00000-0000"
+                                    id="telefone"
+                                    name="telefone"
+                                    placeholder="(00) 00000-0000"
+                                    className="w-full px-3 py-2 rounded-lg bg-black-deep border border-black-light focus:outline-none focus:border-silver-accent"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label htmlFor="data" className="block text-sm font-medium text-white-ice mb-1">Data</label>
+                                    <input type="date" id="data" name="data" className="w-full px-3 py-2 rounded-lg bg-black-deep border border-black-light focus:outline-none focus:border-silver-accent" />
+                                </div>
+                                <div>
+                                    <label htmlFor="horario" className="block text-sm font-medium text-white-ice mb-1">Horário</label>
+                                    <input type="time" id="horario" name="horario" className="w-full px-3 py-2 rounded-lg bg-black-deep border border-black-light focus:outline-none focus:border-silver-accent" />
+                                </div>
+                            </div>
+                            <Button type="submit" variant="primary" className="w-full" icon={Plus}>Agendar</Button>
+                        </form>
+                    </Card>
+                     {/* AI Sections */}
+                    <Card className="p-6">
+                         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2"><Zap className="text-yellow-400"/> Sugestões da IA</h3>
+                         <Button variant="secondary" className="w-full mb-4">Sugerir Horários Livres</Button>
+                         <Button variant="secondary" className="w-full">Ver Estatísticas</Button>
+                    </Card>
+                </div>
+                {/* Coluna Direita: Filtros e Lista */}
+                <div className="lg:col-span-2">
+                     {/* Filters */}
+                     <Card className="p-4 mb-6">
+                        <div className="flex flex-col md:flex-row gap-4 items-center">
+                           <div className="relative flex-grow w-full">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-steel"/>
+                                <input type="text" placeholder="Pesquisar..." className="w-full pl-10 pr-4 py-2 rounded-lg bg-black-deep border border-black-light focus:outline-none focus:border-silver-accent"/>
+                           </div>
+                           <div className="relative w-full md:w-auto">
+                               <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-steel"/>
+                               <select className="w-full md:w-48 appearance-none pl-10 pr-4 py-2 rounded-lg bg-black-deep border border-black-light text-white-ice focus:outline-none focus:border-silver-accent">
+                                    <option value="">Todos</option>
+                                    <option value="pendente">Pendente</option>
+                                    <option value="confirmado">Confirmado</option>
+                                    <option value="cancelado">Cancelado</option>
+                               </select>
+                           </div>
+                           <Button variant="ghost" icon={Download}><span className="hidden md:inline">Exportar</span></Button>
+                        </div>
+                     </Card>
+                     {/* Appointments List */}
+                     <div className="space-y-4">
+                        {agendamentos.length > 0 ? agendamentos.map(ag => (
+                            <Card key={ag.id} className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                <div className="flex-grow">
+                                    <div className="flex items-center gap-4">
+                                        <div className="text-center">
+                                           <p className="font-bold text-lg">{ag.horario}</p>
+                                           <p className="text-xs text-gray-steel">{formatData(ag.data)}</p>
+                                        </div>
+                                        <div>
+                                            <p className="font-semibold">{ag.nome}</p>
+                                            <p className="text-sm text-gray-steel">{ag.telefone}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2 w-full sm:w-auto">
+                                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${ag.status === 'confirmado' ? 'bg-green-500/20 text-green-400' : ag.status === 'pendente' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400'}`}>
+                                        {ag.status}
+                                    </span>
+                                    <Button variant="ghost" className="!p-2"><MoreVertical size={18}/></Button>
+                                </div>
+                            </Card>
+                        )) : (
+                            <Card className="p-8 text-center text-gray-steel">
+                                <Calendar className="mx-auto w-12 h-12 mb-4"/>
+                                Nenhum agendamento encontrado.
+                            </Card>
+                        )}
+                     </div>
+                </div>
             </div>
-             {/* A full implementation would render the AppointmentForm, Filters, AppointmentList, etc. here */}
         </div>
     );
 };
+
 
 // --- MODALS ---
 
