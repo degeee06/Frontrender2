@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback, createContext, useContext, ReactNode, FC, useRef } from 'react';
 import { supabase, signInWithGoogle, signOut, getSession } from './services/supabase';
 import type { Session, User } from '@supabase/supabase-js';
@@ -115,7 +116,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({ children, var
 });
 
 
-const Card: FC<{ children: ReactNode; className?: string }> = ({ children, className, ...props }) => (
+// FIX: Added React.HTMLAttributes<HTMLDivElement> to allow props like onClick.
+const Card: FC<{ children: ReactNode; className?: string } & React.HTMLAttributes<HTMLDivElement>> = ({ children, className, ...props }) => (
     <div className={`bg-black-medium border border-black-light rounded-2xl shadow-soft transition-all duration-300 relative overflow-hidden ${className}`} {...props}>
         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-silver-accent/30 to-transparent" />
         {children}
@@ -399,4 +401,236 @@ const Dashboard: FC = () => {
         <div className="container mx-auto px-4 py-8 max-w-7xl">
             {/* Header */}
             <header className="bg-black-medium border border-black-light rounded-2xl p-6 text-center mb-8 animate-fade-in relative overflow-hidden">
-                <div className="absolute top-
+                <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-silver-accent/30 to-transparent" />
+                <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                    <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold bg-gradient-to-r from-white-pure to-silver-accent text-transparent bg-clip-text">
+                        Agendamento
+                    </h1>
+                     <div className="flex gap-2 w-full sm:w-auto">
+                        <Button variant="secondary" icon={LinkIcon} size="sm">Gerar Link</Button>
+                        <Button variant="secondary" icon={Settings} size="sm">Configurações</Button>
+                        <Button onClick={signOut} icon={LogOut} variant="danger" size="sm">Sair</Button>
+                    </div>
+                </div>
+                <p className="text-sm sm:text-lg text-white-ice max-w-2xl mx-auto mt-4">
+                    Gerencie seus compromissos com uma interface intuitiva e elegante.
+                </p>
+            </header>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Coluna Esquerda: Formulário e IA */}
+                <div className="lg:col-span-1 space-y-8">
+                    <Card className="p-6 animate-fade-in">
+                        <div className="flex items-center justify-center mb-4"><div className="p-3 rounded-full bg-black-light border border-gray-steel shadow-lg"><Calendar className="w-6 h-6 text-white-ice"/></div></div>
+                        <h2 className="text-2xl font-semibold text-center mb-6 bg-gradient-to-r from-white-pure to-silver-accent text-transparent bg-clip-text">Novo Agendamento</h2>
+                        <form onSubmit={handleAgendamentoSubmit} className="space-y-4">
+                             {/* Form Fields */}
+                             <InputField icon={UserIcon} name="nome" placeholder="Nome completo" required/>
+                             <InputField icon={Mail} name="email" type="email" placeholder="Email (opcional)"/>
+                             <InputField icon={Phone} name="telefone" placeholder="(00) 00000-0000" mask="(00) 00000-0000" required/>
+                             <div className="grid grid-cols-2 gap-4">
+                                <InputField icon={Calendar} name="data" type="date" required/>
+                                <InputField icon={Clock} name="horario" type="time" required/>
+                             </div>
+                             <p className="text-xs text-gray-steel mt-1 flex items-center gap-1"><Info className="w-3 h-3"/><span>Horários flexíveis disponíveis</span></p>
+                            <Button type="submit" variant="primary" className="w-full !mt-6" icon={Plus} size="lg">Agendar</Button>
+                        </form>
+                    </Card>
+                    <Card className="p-6 animate-fade-in">
+                         <h3 className="text-xl font-semibold mb-4 flex items-center gap-3"><Zap className="text-yellow-400"/> Ações Inteligentes</h3>
+                         <div className="space-y-3">
+                            <Button variant="secondary" className="w-full">🎯 Sugerir Horários Livres</Button>
+                            <Button variant="secondary" className="w-full">📊 Ver Estatísticas</Button>
+                         </div>
+                    </Card>
+                </div>
+
+                {/* Coluna Direita: Filtros e Lista */}
+                <div className="lg:col-span-2">
+                     <Card className="p-4 mb-6 animate-fade-in">
+                        <div className="flex flex-col md:flex-row gap-4 items-center">
+                           <div className="relative flex-grow w-full">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-steel"/>
+                                <input type="text" placeholder="Pesquisar por nome ou email..." value={searchInput} onChange={e => setSearchInput(e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-lg bg-black-deep border border-black-light focus:outline-none focus:border-silver-accent"/>
+                           </div>
+                           <div className="relative w-full md:w-auto">
+                               <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-steel"/>
+                               <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="w-full md:w-48 appearance-none pl-10 pr-4 py-3 rounded-lg bg-black-deep border border-black-light text-white-ice focus:outline-none focus:border-silver-accent">
+                                    <option value="">Todos Status</option>
+                                    <option value="pendente">Pendente</option>
+                                    <option value="confirmado">Confirmado</option>
+                                    <option value="cancelado">Cancelado</option>
+                               </select>
+                           </div>
+                           <div className="flex gap-2">
+                             <Button variant="ghost" icon={Download} size="sm"><span className="hidden md:inline">CSV</span></Button>
+                             <Button variant="ghost" icon={FileText} size="sm"><span className="hidden md:inline">PDF</span></Button>
+                           </div>
+                        </div>
+                     </Card>
+                     
+                     {/* Date Tabs */}
+                     <div className="mb-6 animate-fade-in">
+                        <div className="flex justify-center gap-2 overflow-x-auto pb-2">
+                            {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((dia, index) => (
+                                <button key={dia} onClick={() => setDiaSelecionado(index)} className={`px-5 py-2.5 rounded-xl transition-all font-medium whitespace-nowrap ${diaSelecionado === index ? 'bg-silver-accent text-black-absolute' : 'bg-black-medium hover:bg-black-light'}`}>
+                                    {dia}
+                                </button>
+                            ))}
+                        </div>
+                     </div>
+
+                     <div className="space-y-4 custom-scrollbar max-h-[60vh] overflow-y-auto pr-2">
+                        {loadingAgendamentos ? <div className="flex justify-center p-8"><Spinner className="w-8 h-8"/></div>
+                        : filteredAgendamentos.length > 0 ? filteredAgendamentos.map(ag => (
+                            <AgendamentoCard key={ag.id} agendamento={ag} onUpdate={fetchAgendamentos} />
+                        )) : (
+                            <Card className="p-8 text-center text-gray-steel animate-fade-in">
+                                <Calendar className="mx-auto w-12 h-12 mb-4"/>
+                                Nenhum agendamento encontrado para os filtros selecionados.
+                            </Card>
+                        )}
+                     </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// --- Child Components for Dashboard ---
+
+interface InputFieldProps extends React.InputHTMLAttributes<HTMLInputElement> {
+    icon: React.ElementType;
+    mask?: string;
+}
+const InputField: FC<InputFieldProps> = ({ icon: Icon, mask, name, ...props }) => (
+    <div className="relative">
+        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Icon className="w-5 h-5 text-gray-steel" />
+        </div>
+        {mask ? (
+             <IMaskInput
+                mask={mask}
+                name={name}
+                className="w-full pl-10 pr-4 py-3 rounded-lg bg-black-deep border border-black-light focus:outline-none focus:border-silver-accent"
+                {...props as any}
+             />
+        ) : (
+             <input
+                name={name}
+                className="w-full pl-10 pr-4 py-3 rounded-lg bg-black-deep border border-black-light focus:outline-none focus:border-silver-accent"
+                {...props}
+             />
+        )}
+    </div>
+);
+
+
+const AgendamentoCard: FC<{agendamento: Agendamento, onUpdate: () => void}> = ({ agendamento, onUpdate }) => {
+    const { token } = useAuth();
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    
+    const handleStatusChange = async (newStatus: 'confirmado' | 'cancelado') => {
+        if (!token) return;
+        setIsSubmitting(true);
+        const endpoint = newStatus === 'confirmado' ? 'confirmar' : 'cancelar';
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("User not found");
+            const res = await fetch(`${API_BASE_URL}/agendamentos/${user.email}/${endpoint}/${agendamento.id}`, {
+                method: "POST",
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            if (res.ok) {
+                showToast(`Agendamento ${newStatus}!`, 'success');
+                onUpdate();
+            } else {
+                const result = await res.json();
+                showToast(result.msg || `Erro ao ${endpoint}`, 'error');
+            }
+        } catch (error) {
+             showToast(`Erro ao ${endpoint}`, 'error');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+    
+    return (
+        <Card className="p-5 animate-fade-in">
+            <div className="flex justify-between items-start mb-3">
+                <div className="flex items-center gap-3">
+                    <Clock className="w-5 h-5 text-gray-steel"/>
+                    <span className="font-bold text-lg">{agendamento.horario}</span>
+                </div>
+                <span className={`text-xs px-3 py-1 rounded-full font-semibold ${
+                    agendamento.status === 'confirmado' ? 'bg-green-500/20 text-green-300' :
+                    agendamento.status === 'pendente' ? 'bg-yellow-500/20 text-yellow-300' :
+                    'bg-red-500/20 text-red-300'
+                }`}>
+                    {agendamento.status}
+                </span>
+            </div>
+             <div className="flex items-center gap-4 mb-4">
+                <div className="w-12 h-12 rounded-full bg-black-light flex-shrink-0 flex items-center justify-center">
+                    <UserIcon className="w-6 h-6 text-gray-steel"/>
+                </div>
+                <div>
+                    <h3 className="font-semibold text-white-pure">{agendamento.nome}</h3>
+                    <p className="text-sm text-gray-steel">{formatData(agendamento.data)}</p>
+                </div>
+            </div>
+            <div className="border-t border-black-light pt-3 mt-3 flex flex-wrap gap-2">
+                {agendamento.status !== 'confirmado' &&
+                    <Button size="sm" onClick={() => handleStatusChange('confirmado')} icon={Check} isLoading={isSubmitting}>Confirmar</Button>
+                }
+                {agendamento.status !== 'cancelado' &&
+                    <Button size="sm" variant="danger" onClick={() => handleStatusChange('cancelado')} icon={X} isLoading={isSubmitting}>Cancelar</Button>
+                }
+                <Button size="sm" variant="ghost" icon={RefreshCw}>Reagendar</Button>
+            </div>
+        </Card>
+    )
+}
+
+// --- MODALS ---
+
+interface ModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    children: ReactNode;
+    title: string;
+}
+const Modal: FC<ModalProps> = ({ isOpen, onClose, children, title }) => {
+    if (!isOpen) return null;
+    return (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
+            <Card className="w-full max-w-lg animate-fade-in" onClick={(e) => e.stopPropagation()}>
+                <div className="p-6">
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-xl font-bold">{title}</h2>
+                        <Button variant="ghost" className="!p-2" onClick={onClose}><X/></Button>
+                    </div>
+                    {children}
+                </div>
+            </Card>
+        </div>
+    );
+}
+
+const TermsModal: FC<{ isOpen: boolean; onAccept: () => void; onDecline: () => void }> = ({ isOpen, onAccept, onDecline }) => (
+    <Modal isOpen={isOpen} onClose={onDecline} title="📝 Termos de Uso">
+         <div className="bg-black-deep rounded-lg p-4 mb-6 max-h-60 overflow-y-auto custom-scrollbar text-sm space-y-3 text-white-ice">
+            <strong>Data de criação: 2025</strong>
+            <h4 className="font-semibold text-silver-accent">1. Aceitação dos Termos</h4>
+            <p>Ao utilizar nosso sistema de agendamentos, você concorda com estes Termos de Uso e nossa Política de Privacidade.</p>
+            <h4 className="font-semibold text-silver-accent">2. Uso do Serviço</h4>
+            <p>Você concorda em usar a plataforma apenas para fins legítimos de agendamento, sendo responsável pelas informações cadastradas.</p>
+            <h4 className="font-semibold text-silver-accent">3. Privacidade e Dados</h4>
+            <p>Seus dados são armazenados com segurança. Não compartilhamos suas informações com terceiros não autorizados.</p>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-4">
+            <Button variant="secondary" className="w-full" onClick={onDecline}>Recusar</Button>
+            <Button variant="primary" className="w-full" onClick={onAccept} icon={Check}>Aceitar e Continuar</Button>
+        </div>
+    </Modal>
+);
